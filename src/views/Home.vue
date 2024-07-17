@@ -1,46 +1,4 @@
 <!-- 首页 -->
-<script setup>
-import { ref } from "vue";
-import PersonalInfo from "./PersonalInfo.vue"
-import formRules from "@/utils/formRules";
-import {
-  Folder, FolderAdd, Share, ChatLineRound, Setting, SwitchButton, Edit, DocumentCopy,
-  DocumentRemove, DeleteFilled, InfoFilled, UploadFilled
-} from '@element-plus/icons-vue'
-
-//是否显示头部功能按钮
-let isVisibleTopItems = ref(false);
-const showTopItems = (val) => {
-  isVisibleTopItems.value = val;
-}
-
-
-//是否显示新建文件夹对话框
-let newFolderDialogVisible = ref(false);
-//弹出新建文件夹对话框点击事件
-const createNewFolderClick = () => {
-  newFolderDialogVisible.value = true;
-}
-//新建目录输入框
-let newFolderName = ref('')
-
-
-
-const problemFormRef = ref(null)
-//是否显示问题反馈对话框
-let problemDialogVisible = ref(false)
-//反馈的问题
-let problemForm = ref({
-  problem: '',
-  email: ''
-})
-
-
-
-//是否显示退出登录对话框
-let logoutDialogVisible = ref(false)
-</script>
-
 <template>
   <div class="home">
     <el-container>
@@ -101,14 +59,16 @@ let logoutDialogVisible = ref(false)
       <el-container>
         <el-aside>
           <div class="leftAside">
-            <el-button>
-              <span class="buttonContent">
-                <el-icon :size="26">
-                  <Folder />
-                </el-icon>
-                <el-text>我的文件</el-text>
-              </span>
-            </el-button>
+            <router-link to="/home/myFile">
+              <el-button>
+                <span class="buttonContent">
+                  <el-icon :size="26">
+                    <Folder />
+                  </el-icon>
+                  <el-text>我的文件</el-text>
+                </span>
+              </el-button>
+            </router-link>
             <el-button @click="createNewFolderClick">
               <span class="buttonContent">
                 <el-icon :size="26">
@@ -118,14 +78,16 @@ let logoutDialogVisible = ref(false)
               </span>
             </el-button>
             <el-divider />
-            <el-button>
-              <span class="buttonContent">
-                <el-icon :size="26">
-                  <Share />
-                </el-icon>
-                <el-text>我的分享</el-text>
-              </span>
-            </el-button>
+            <router-link to="/home/myShare">
+              <el-button>
+                <span class="buttonContent">
+                  <el-icon :size="26">
+                    <Share />
+                  </el-icon>
+                  <el-text>我的分享</el-text>
+                </span>
+              </el-button>
+            </router-link>
             <el-button @click="problemDialogVisible = true">
               <span class="buttonContent">
                 <el-icon :size="26">
@@ -135,14 +97,17 @@ let logoutDialogVisible = ref(false)
               </span>
             </el-button>
             <el-divider />
-            <el-button>
-              <span class="buttonContent">
-                <el-icon :size="26">
-                  <Setting />
-                </el-icon>
-                <el-text>个人中心</el-text>
-              </span>
-            </el-button>
+            <router-link to="/home/personalInfo">
+              <el-button>
+                <span class="buttonContent">
+                  <el-icon :size="26">
+                    <Setting />
+                  </el-icon>
+                  <el-text>个人中心</el-text>
+                </span>
+              </el-button>
+            </router-link>
+
             <el-button @click="logoutDialogVisible = true">
               <span class="buttonContent">
                 <el-icon :size="26">
@@ -154,7 +119,7 @@ let logoutDialogVisible = ref(false)
           </div>
         </el-aside>
         <el-main>
-          <PersonalInfo />
+          <router-view />
         </el-main>
       </el-container>
     </el-container>
@@ -174,7 +139,8 @@ let logoutDialogVisible = ref(false)
 
   <!-- 问题反馈弹出框 -->
   <el-dialog class="problemDialog" v-model="problemDialogVisible" title="意见与反馈" width="50%" align-center>
-    <el-form :model="problemForm" :rules="formRules" ref="problemFormRef" label-width="auto" label-position="top" class="problemDialogForm">
+    <el-form :model="problemForm" :rules="formRules" ref="problemFormRef" label-width="auto" label-position="top"
+      class="problemDialogForm">
       <el-form-item label="意见与问题" prop="problem">
         <el-input v-model="problemForm.problem" type="textarea" placeholder="您可以向我们提出一些疑问或者建设性意见" clearable
           :autosize="{ minRows: 4 }"></el-input>
@@ -198,11 +164,60 @@ let logoutDialogVisible = ref(false)
     <template #footer>
       <div class="dialog-footer">
         <el-button @click="logoutDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="logoutDialogVisible = false">确认</el-button>
+        <el-button type="primary" @click="logoutClick">确认</el-button>
       </div>
     </template>
   </el-dialog>
 </template>
+
+<script setup>
+import { ref } from "vue";
+import formRules from "@/utils/formRules";
+import { RouterView, useRouter } from 'vue-router'
+import {
+  Folder, FolderAdd, Share, ChatLineRound, Setting, SwitchButton, Edit, DocumentCopy,
+  DocumentRemove, DeleteFilled, InfoFilled, UploadFilled
+} from '@element-plus/icons-vue'
+
+const router = useRouter();
+
+//是否显示头部功能按钮
+let isVisibleTopItems = ref(false);
+const showTopItems = (val) => {
+  isVisibleTopItems.value = val;
+}
+
+
+//是否显示新建文件夹对话框
+let newFolderDialogVisible = ref(false);
+//弹出新建文件夹对话框点击事件
+const createNewFolderClick = () => {
+  newFolderDialogVisible.value = true;
+}
+//新建目录输入框
+let newFolderName = ref('')
+
+
+
+const problemFormRef = ref(null)
+//是否显示问题反馈对话框
+let problemDialogVisible = ref(false)
+//反馈的问题
+let problemForm = ref({
+  problem: '',
+  email: ''
+})
+
+
+
+//是否显示退出登录对话框
+let logoutDialogVisible = ref(false)
+//退出登录点击事件
+const logoutClick = () => {
+  logoutDialogVisible.value = false;
+  router.push('/login');
+}
+</script>
 
 <style scoped>
 .home {
@@ -306,5 +321,14 @@ let logoutDialogVisible = ref(false)
 .leftAside .buttonContent {
   display: flex;
   flex-direction: row;
+}
+
+.router-link-active {
+  text-decoration: none;
+  background-color: transparent;
+}
+
+a:hover {
+  background-color: transparent;
 }
 </style>

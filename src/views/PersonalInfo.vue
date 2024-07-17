@@ -1,7 +1,8 @@
 <!-- 个人中心页面 -->
 <script setup>
 import { onMounted, ref } from 'vue';
-import formRules from "@/utils/formRules";
+import Progress from '../components/Progress.vue'
+import regularCode from '@/assets/locale/regularCode';
 
 let isShowImgMasking = ref(false)
 //头像鼠标移入事件
@@ -16,27 +17,54 @@ const imgMaskingMouseOut = () => {
 
 //密码重置
 let resetPassword = ref({
-    oldPassword:'',
-    newPassword:'',
-    verifyPassword:''
+    oldPassword: '',
+    newPassword: '',
+    verifyPassword: ''
+})
+
+//邮箱重置
+let resetEmail = ref({
+    newEmail:'',
+    verifyCode: ''
 })
 
 
 
-onMounted(() => {
-    //给 formRules 添加校验 verifyPassword 的校验规则
-    formRules.verifyPassword = [
-        {required: true, message: '密码 4 ~ 16 位，不包含特殊字符', trigger: 'blur'},
-        {validator:(rule, value, callback) => {
-            if (value == '' || value != resetPassword.value.newPassword) {
-                callback(new Error('密码 4 ~ 16位，不包含特殊字符'));
-            } else {
-                callback();
-            }
-        }, trigger: 'blur'}
+//表单验证
+const passwordVerify = regularCode.passwordVerify;
+const validatorVerifyPassword = (rule, value, callback) => {
+    console.log(passwordVerify.test(value));
+    if (!passwordVerify.test(value)) {
+        callback(new Error("密码 4 ~ 16 位，不包含特殊字符"))
+    } else if (value != resetPassword.value.newPassword) {
+        callback(new Error("确认密码和新密码不一致"))
+    } else {
+        callback()
+    }
+}
+const formRules = ref({
+    oldPassword: [
+        { required: true, message: '密码输入不可以为空', trigger: 'blur' },
+        { pattern: passwordVerify, message: '密码 4 ~ 16 位，只能包含字母和数字', trigger: 'blur' }
+    ],
+    newPassword: [
+        { required: true, message: '密码输入不可以为空', trigger: 'blur' },
+        { pattern: passwordVerify, message: '密码 4 ~ 16 位，只能包含字母和数字', trigger: 'blur' }
+    ],
+    verifyPassword: [
+        { required: true, message: '密码输入不可以为空', trigger: 'blur' },
+        { validator: validatorVerifyPassword, trigger: 'blur' }
+    ],
+    newEmail: [
+        {required: true, message: '请填写邮箱，我们才能回复您', trigger: 'blur'},
+        {type: 'email', message: '请输入正确格式的邮箱地址', trigger: ['blur', 'change']}
+    ],
+    verifyCode: [
+        {required:true, message: '请填写正确的邮箱验证码', trigger: 'blur'}
     ]
-});
-let resetPasswordFormRef = ref(null)
+}
+)
+const resetFormRef = ref(null)
 </script>
 
 <template>
@@ -68,15 +96,18 @@ let resetPasswordFormRef = ref(null)
                     <template #header>
                         <el-text class="cardHeader">重置密码</el-text>
                     </template>
-                    <el-form :model="resetPassword" :rules="formRules" ref="resetPasswordFormRef" label-width="120px">
-                        <el-form-item label="原密码" prop="password">
-                            <el-input type="password" size="large" placeholder="原始密码" v-model="resetPassword.oldPassword" clearable></el-input>
+                    <el-form :model="resetPassword" :rules="formRules" ref="resetFormRef" label-width="120px">
+                        <el-form-item label="原密码" prop="oldPassword">
+                            <el-input type="password" size="large" placeholder="原始密码"
+                                v-model="resetPassword.oldPassword" clearable show-password></el-input>
                         </el-form-item>
-                        <el-form-item label="新密码" prop="password">
-                            <el-input type="password" size="large" placeholder="新密码" v-model="resetPassword.newPassword" clearable></el-input>
+                        <el-form-item label="新密码" prop="newPassword">
+                            <el-input type="password" size="large" placeholder="新密码" v-model="resetPassword.newPassword"
+                                clearable show-password></el-input>
                         </el-form-item>
                         <el-form-item label="确认密码" prop="verifyPassword">
-                            <el-input type="password" size="large" placeholder="确认密码" v-model="resetPassword.verifyPassword" clearable></el-input>
+                            <el-input type="password" size="large" placeholder="确认密码"
+                                v-model="resetPassword.verifyPassword" clearable show-password></el-input>
                         </el-form-item>
                         <el-form-item class="formButton">
                             <el-button type="primary" size="large">提交</el-button>
@@ -91,6 +122,20 @@ let resetPasswordFormRef = ref(null)
                     <template #header>
                         <el-text class="cardHeader">重置邮箱</el-text>
                     </template>
+                    
+                    <el-form :model="resetEmail" :rules="formRules" ref="resetFormRef" label-width="120px">
+                        <el-form-item label="新邮箱" prop="newEmail">
+                            <el-input size="large" placeholder="请输入新的邮箱地址"
+                                v-model="resetEmail.newEmail" clearable></el-input>
+                        </el-form-item>
+                        <el-form-item label="验证码" prop="verifyCode">
+                            <el-input size="large" placeholder="请输入邮箱验证码"
+                                v-model="resetEmail.verifyCode" clearable></el-input>
+                        </el-form-item>
+                        <el-form-item class="formButton">
+                            <el-button type="primary" size="large">提交</el-button>
+                        </el-form-item>
+                    </el-form>
                 </el-card>
             </el-col>
             <el-col :span="12">
@@ -98,6 +143,9 @@ let resetPasswordFormRef = ref(null)
                     <template #header>
                         <el-text class="cardHeader">我的容量</el-text>
                     </template>
+                    <div class="myStorage">
+                        <Progress :currentStorage="'9.44MB'" :totalStorage="'100GB'" :title="'网盘扩容'"/>
+                    </div>
                 </el-card>
             </el-col>
         </el-row>
@@ -207,5 +255,9 @@ let resetPasswordFormRef = ref(null)
 
 .el-form .formButton {
     float: right;
+}
+.myStorage {
+    width: 100%;
+    height: 100%;
 }
 </style>
