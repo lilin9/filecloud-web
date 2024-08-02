@@ -1,10 +1,8 @@
 import axios from "axios";
-import router from "@/router";
-
+import { ElMessage } from "element-plus";
 
 const instance = axios.create({
     timeout: 50000,
-    baseURL: 'http://127.0.0.1:5173/',
     headers: {
         'Content-Type': 'application/json;charset=utf-8'
     }
@@ -12,6 +10,7 @@ const instance = axios.create({
 
 //请求拦截器
 instance.interceptors.request.use(config => {
+    config.url = `/api${config.url}`;
     return config;
 }, error => {
     return Promise.reject(error);
@@ -20,11 +19,11 @@ instance.interceptors.request.use(config => {
 //返回拦截器
 instance.interceptors.response.use(res => {
     const data = res.data;
-    if (data.code == 20000) {
-        router.push('/login');
-    }
-    return Promise.resolve(res);
+    return Promise.resolve(data);
 }, error => {
+    if (error.code === 'ERR_BAD_RESPONSE' && error.message.includes('500')) {
+        ElMessage.error('请求超时，请稍后再试');
+    }
     return Promise.reject(error);
 });
 

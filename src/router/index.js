@@ -4,6 +4,7 @@ import Home from '@/views/Home.vue'
 import MyShare from '@/views/MyShare.vue'
 import MyFile from '@/views/MyFile.vue'
 import PersonalInfo from '@/views/PersonalInfo.vue'
+import local from '@/utils/storageUtils'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -43,5 +44,16 @@ const router = createRouter({
     }
   ]
 })
+
+
+//定义路由守卫
+router.beforeEach((to, from, next) => {
+  var user = local.FindForLocal(local.getLoginKey());
+  if (!user && to.name != 'login') {
+      next({name: 'login'});
+  } else {
+      next();
+  }
+});
 
 export default router

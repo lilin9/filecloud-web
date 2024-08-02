@@ -1,4 +1,72 @@
 <!-- 首页 -->
+<script setup>
+import { getCurrentInstance, ref } from "vue";
+import formRules from "@/utils/formRules";
+import { RouterView, useRouter } from 'vue-router'
+import {
+  Folder, FolderAdd, Share, ChatLineRound, Setting, SwitchButton, Edit, DocumentCopy,
+  DocumentRemove, DeleteFilled, InfoFilled, UploadFilled
+} from '@element-plus/icons-vue'
+import { ElMessageBox } from "element-plus";
+
+const router = useRouter()
+const { proxy } = getCurrentInstance();
+const api = proxy.$api;
+const local = proxy.$local;
+
+//是否显示头部功能按钮
+let isVisibleTopItems = ref(false);
+const showTopItems = (val) => {
+  isVisibleTopItems.value = val;
+}
+
+
+//是否显示新建文件夹对话框
+let newFolderDialogVisible = ref(false);
+//弹出新建文件夹对话框点击事件
+const createNewFolderClick = () => {
+  newFolderDialogVisible.value = true;
+}
+//新建目录输入框
+let newFolderName = ref('')
+
+
+
+const problemFormRef = ref(null)
+//是否显示问题反馈对话框
+let problemDialogVisible = ref(false)
+//反馈的问题
+let problemForm = ref({
+  problem: '',
+  email: ''
+})
+
+
+//退出登录点击事件
+const logoutClick = () => {
+  ElMessageBox.confirm(
+    '你确认要登出系统吗?',
+    '提示',
+    {
+      confirmButtonText: '确认',
+      cancelButtonText: '取消',
+      type: 'Warning',
+      center: true
+    }
+  ).then(() => {
+    local.DeleteForLocal(local.getLoginKey());  //清除本地缓存
+    router.push('/login');
+  });
+}
+
+
+
+//接受子页面的数据
+const receiveChild = (data) => {
+  isVisibleTopItems.value = data.showTopItem
+}
+</script>
+
 <template>
   <div class="home">
     <el-container>
@@ -108,7 +176,7 @@
               </el-button>
             </router-link>
 
-            <el-button @click="logoutDialogVisible = true">
+            <el-button @click="logoutClick">
               <span class="buttonContent">
                 <el-icon :size="26">
                   <SwitchButton />
@@ -119,7 +187,7 @@
           </div>
         </el-aside>
         <el-main>
-          <router-view />
+          <router-view @dataByChild="receiveChild"/>
         </el-main>
       </el-container>
     </el-container>
@@ -156,68 +224,7 @@
       </div>
     </template>
   </el-dialog>
-
-
-  <!-- 登出弹出框 -->
-  <el-dialog v-model="logoutDialogVisible" title="提示" width="20%" align-center>
-    <el-text>确认退出吗？</el-text>
-    <template #footer>
-      <div class="dialog-footer">
-        <el-button @click="logoutDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="logoutClick">确认</el-button>
-      </div>
-    </template>
-  </el-dialog>
 </template>
-
-<script setup>
-import { ref } from "vue";
-import formRules from "@/utils/formRules";
-import { RouterView, useRouter } from 'vue-router'
-import {
-  Folder, FolderAdd, Share, ChatLineRound, Setting, SwitchButton, Edit, DocumentCopy,
-  DocumentRemove, DeleteFilled, InfoFilled, UploadFilled
-} from '@element-plus/icons-vue'
-
-const router = useRouter();
-
-//是否显示头部功能按钮
-let isVisibleTopItems = ref(false);
-const showTopItems = (val) => {
-  isVisibleTopItems.value = val;
-}
-
-
-//是否显示新建文件夹对话框
-let newFolderDialogVisible = ref(false);
-//弹出新建文件夹对话框点击事件
-const createNewFolderClick = () => {
-  newFolderDialogVisible.value = true;
-}
-//新建目录输入框
-let newFolderName = ref('')
-
-
-
-const problemFormRef = ref(null)
-//是否显示问题反馈对话框
-let problemDialogVisible = ref(false)
-//反馈的问题
-let problemForm = ref({
-  problem: '',
-  email: ''
-})
-
-
-
-//是否显示退出登录对话框
-let logoutDialogVisible = ref(false)
-//退出登录点击事件
-const logoutClick = () => {
-  logoutDialogVisible.value = false;
-  router.push('/login');
-}
-</script>
 
 <style scoped>
 .home {
