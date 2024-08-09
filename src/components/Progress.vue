@@ -1,21 +1,25 @@
 <!-- 进度条组件 -->
-<template>
-    <div class="progress">
-        <div class="storageTitle">
-            <el-text class="left">网盘：{{ props.currentStorage }}/{{props.totalStorage }}</el-text>
-            <el-text class="right">{{ props.title }}</el-text>
-        </div>
-        <el-progress :percentage="50" :show-text="false" />
-    </div>
-</template>
 <script setup>
+import { toRefs } from 'vue';
 
 const props = defineProps({
     currentStorage: String,
     totalStorage: String,
-    title: String
-})
+    ratio: Number,
+    title: String,
+});
+
+const { currentStorage, totalStorage, ratio, title } = toRefs(props);
 </script>
+<template>
+    <div class="progress">
+        <div class="storageTitle">
+            <el-text class="left">网盘：{{ currentStorage }}/{{ totalStorage }}</el-text>
+            <el-text class="right">{{ title }}</el-text>
+        </div>
+        <el-progress :percentage="ratio" :show-text="false" />
+    </div>
+</template>
 <style scoped>
 .progress {
     width: 100%;

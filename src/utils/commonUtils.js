@@ -1,5 +1,3 @@
-import axios from "axios";
-import { saveAs } from 'file-saver'
 import { ElMessage } from "element-plus";
 
 const ImgMimeTypes = [
@@ -37,79 +35,29 @@ export default {
     },
 
     //调用浏览器进行文件下载
-    startDownload(fileUrl) {
-        const fileName = fileUrl.substring(fileUrl.lastIndexOf('/') + 1);
+    async startDownload(fileUrl) {
+        if (typeof fileUrl != 'string' || fileUrl.length <= 0) {
+            return;
+        }
 
-        if (typeof fileUrl !== 'string' || fileUrl.length <= 0) return
-        let f = document.createElement('a')
-        f.id = 'download-' + new Date().getTime()
-        f.href = fileUrl
-        f.download = fileName || '下载'
-        f.style.opacity = '0'
-        f.style.height = '1px'
-        f.style.width = '1px'
-        f.style.overflow = 'hidden'
-        f.style.position = 'fixed'
-        f.style.top = '-1'
-        f.style.left = '-1'
-        f.style.zIndex = '-1'
-        f.style.display = 'none'
-        f.target = '_blank'
-        document.body.appendChild(f)
-        document.querySelector('#' + f.id).click()
-        document.body.removeChild(document.getElementById(f.id))
-
-
-        // fileUrl = FileDownloadApi + fileUrl;
-        // fetch(fileUrl).then(res => res.blob())
-        // .then(blob => {
-        //     let url = window.URL.createObjectURL(blob)
-        //     let a = document.createElement('a')
-        //     a.style.display = 'none'
-        //     a.href = url
-        //     a.download = fileUrl.substring(fileUrl.lastIndexOf('/') + 1);
-        //     document.body.appendChild(a)
-        //     a.click()
-        //     window.URL.revokeObjectURL(url)
-        //     document.body.removeChild(a)
-        // })
-
-        // if (fileUrl == null || fileUrl == '' || fileUrl == undefined) {
-        //     return;
-        // }
-
-        // const fileName = fileUrl.substring(fileUrl.lastIndexOf('/') + 1);
-        // const apiUrl = FileDownloadApi + fileUrl;
-        // axios.post(apiUrl).then(res => {
-        //     saveAs(res.data, fileName);
-        // }).catch(err => {
-        //     ElMessage.error('文件下载失败，请重试');
-        // });
-
-        // const fileName = fileUrl.substring(fileUrl.lastIndexOf('/') + 1);
-        // const x = new XMLHttpRequest();
-        // x.open('GET', fileUrl, true);
-        // x.responseType = 'blob';
-        // x.setRequestHeader = {'access-control-allow-origin': '*'};
-        // x.onload = e => {
-        //     const url = window.URL.createObjectURL(x.response);
-        //     const a = document.createElement('a');
-        //     a.href = url;
-        //     a.download = fileName;
-        //     a.click();
-        // }
-        // x.send();
-
-        // try {
-        //     const fileName = fileUrl.substring(fileUrl.lastIndexOf('/') + 1);
-        //     const a = document.createElement('a');
-        //     a.href = fileUrl + '&response-content-disposition=' + encodeURIComponent('attachment;filename="' + fileName + '"');
-        //     a.download = fileName;
-        //     document.body.appendChild(a);
-        //     a.click();
-        //     document.body.removeChild(a);
-        // } catch (error) {
-        //     ElMessage.error('文件下载失败，请重试');
-        // }
+        try {
+            const response = await fetch(fileUrl);
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            const blob = await response.blob();
+            const fileName = fileUrl.substring(fileUrl.lastIndexOf('/') + 1);
+            const link = document.createElement('a');
+            link.style.display = 'none';
+            link.href = URL.createObjectURL(blob);
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(link.href);
+        } catch(err) {
+            ElMessage.error('文件下载失败，请重试');
+            console.log(err);
+        }
     }
 }

@@ -1,17 +1,21 @@
 <!-- 我的文件页面 -->
 <script setup>
-import { ArrowRight, HomeFilled, Folder, Files, Picture,PictureFilled } from '@element-plus/icons-vue'
-import { getCurrentInstance, onMounted, ref } from 'vue';
+import acceptEventUtils from '@/utils/acceptEventUtils';
+import emitEventUtils from '@/utils/emitEventUtils';
+import { ArrowRight, HomeFilled, Folder, Files, Picture, PictureFilled } from '@element-plus/icons-vue'
+import { getCurrentInstance, onBeforeUnmount, onMounted, ref, toRaw, watch } from 'vue';
+
 
 const { proxy } = getCurrentInstance();
-const emit = defineEmits(["dataByChild"])
 const api = proxy.$api;
 const utils = proxy.$utils;
+const emit = defineEmits(["dataForChild"])
+
 
 //表格是否显示加载动画
 const showLoading = ref(false);
 //请求后台接口参数
-const tableListParams = ref({
+const queryListParams = ref({
   pageIndex: 1,
   pageSize: 10,
   parentId: null
@@ -21,19 +25,25 @@ const previewImgData = ref({
   showImg: false,
   dataList: []
 });
+//当前文件页面的父文件数据
+const parentRowData = ref(null);
 
 
 
 //面包屑列表数据
 const breadcrumbList = ref([]);
-const pushBreadcrumbList = (text, fileId) => {
-  breadcrumbList.value.push({ text, fileId });
+const pushBreadcrumbList = (row) => {
+  breadcrumbList.value.push(row);
 }
 
 //面包屑项的点击事件
 const breadcrumbItemClick = (fileId, index) => {
-  const params = tableListParams.value;
+  const params = queryListParams.value;
+  //记录用户点击的面包项
+  parentRowData.value = index == -1 ? "" : breadcrumbList.value[index];
+  //pop掉用户点击的项后面的数据
   breadcrumbList.value.splice(index + 1);
+  //重新请求表格数据
   loadFileList(params.pageIndex, params.pageSize, fileId);
 }
 
@@ -53,6 +63,10 @@ const loadFileList = async (pageIndex, pageSize, parentId) => {
 
   showLoading.value = false;
 }
+//将 loadFileList 注册进事件总线中
+const acceptLoadFileList = (data) => {
+  loadFileList(data.pageIndex, data.pageSize, data.parentId);
+}
 
 
 
@@ -61,33 +75,34 @@ const formatDate = (row, column, cellValue) => {
   return utils.formatDate(cellValue);
 }
 
-//选中行高亮点击事件
-const selectedRowClick = (row, column, event) => {
-  emit('dataByChild', { showTopItem: true })
-}
-
 //表格行被双击事件
 const rowDoubleClick = (row, column, event) => {
   const rowData = JSON.parse(JSON.stringify(row));
   //判断当前行是否是文件夹
-  //不是文件夹不进行查询操作
   if (!rowData.isFolder) {
     //进行非文件夹操作
-    RowDataHandler(rowData);
+    FileRowHandler(rowData);
     return;
   }
-
-  //添加面包屑列表
-  pushBreadcrumbList(row.fileName, row.fileId);
-  //查询文件夹内部文件列表
-  const params = tableListParams.value;
-  loadFileList(params.pageIndex, params.pageSize, rowData.fileId);
+  //对文件夹进行操作
+  FolderRowHandler(row);
 }
 
-//对表格行数据进行处理操作
-const RowDataHandler = (row) => {
+//对表格文件夹行数据进行处理操作
+const FolderRowHandler = (row) => {
+  //记录当前行
+  parentRowData.value = row;
+  //添加面包屑列表
+  pushBreadcrumbList(row);
+  //查询文件夹内部文件列表
+  const params = queryListParams.value;
+  loadFileList(params.pageIndex, params.pageSize, row.fileId);
+}
+
+//对表格行文件数据进行处理操作
+const FileRowHandler = (row) => {
   const previewData = previewImgData.value;
-  const staticDownloadUrl = row.staticDownloadUrl;
+  const dynamicDownloadUrl = row.dynamicDownloadUrl;
   //假如是图片的话，展示预览大图
   if (utils.judgeImg(row.fileMimeType)) {
     previewData.showImg = true;
@@ -95,15 +110,37 @@ const RowDataHandler = (row) => {
     return;
   }
   //其他就进行文件下载操作
-  utils.startDownload(row.dynamicDownloadUrl);
+  utils.startDownload(dynamicDownloadUrl);
+}
+
+//当前行发生改变事件
+const currentChangeHandler = (currentRow, oldRow) => {
+  if (currentRow != null) {
+    emitEventUtils.emitSelectedTableRow(currentRow);
+    emitEventUtils.emitEnableTopOptions(true);
+  } else {
+    emitEventUtils.emitEnableTopOptions(false);
+  }
 }
 
 
 
+watch(parentRowData, (newVal, oldVal) => {
+  //parentRowData 发生变化时，发布事件
+  emitEventUtils.emitTableChanged(parentRowData.value);
+});
+
 onMounted(() => {
+  //将 loadFileList 注册进全局总线
+  acceptEventUtils.onLoadFileList(acceptLoadFileList);
   //加载文件列表
-  let params = tableListParams.value;
+  let params = queryListParams.value;
   loadFileList(params.pageIndex, params.pageSize, params.parentId);
+});
+
+onBeforeUnmount(() => {
+    //销毁事件总线注册事件
+    acceptEventUtils.offLoadFileList(acceptLoadFileList);
 });
 </script>
 
@@ -116,12 +153,12 @@ onMounted(() => {
         </el-icon>
       </el-breadcrumb-item>
       <el-breadcrumb-item class="breadcrumbItem" v-for="(item, index) in breadcrumbList" :key="item.fileId"
-        @click="breadcrumbItemClick(item.fileId, index)">{{ item.text }}</el-breadcrumb-item>
+        @click="breadcrumbItemClick(item.fileId, index)">{{ item.fileName }}</el-breadcrumb-item>
     </el-breadcrumb>
     <el-divider />
-    <el-table :data="tableData" :row-style="{ height: '65px' }" highlight-current-row @row-click="selectedRowClick"
+    <el-table :data="tableData" :row-style="{ height: '65px' }" highlight-current-row
       :header-cell-style="{ backgroundColor: '#fafafa', marginBottom: '15px' }" class="fileTable"
-      v-loading="showLoading" @row-dblclick="rowDoubleClick">
+      v-loading="showLoading" @row-dblclick="rowDoubleClick" @current-change="currentChangeHandler">
       <el-table-column label="名称" min-width="95%">
         <template #default="scope">
           <div class="table-fileName">
@@ -143,11 +180,13 @@ onMounted(() => {
     </el-table>
 
     <!-- 预览大图部分 -->
-    <el-image-viewer :url-list="previewImgData.dataList" :zoom-rate="1.2" :max-scale="7" :min-scale="0.2" v-if="previewImgData.showImg"
-      @close="previewImgData.showImg = false">
+    <el-image-viewer :url-list="previewImgData.dataList" :zoom-rate="1.2" :max-scale="7" :min-scale="0.2"
+      v-if="previewImgData.showImg" @close="previewImgData.showImg = false">
       <template #error>
         <div class="image-slot">
-          <el-icon><PictureFilled /></el-icon>
+          <el-icon>
+            <PictureFilled />
+          </el-icon>
         </div>
       </template>
     </el-image-viewer>

@@ -30,11 +30,11 @@ instance.interceptors.response.use(res => {
 
 //封装请求类型
 const http = {
-    get(url, data) {
-        return instance.get(url, { params: data });
+    get(url, data, config = 'application/json;charset=utf-8') {
+        return instance.get(url, { params: data }, config);
     },
-    post(url, data) {
-        return instance.post(url, data);
+    post(url, data, config = 'application/json;charset=utf-8') {
+        return instance.post(url, data, config);
     }
 }
 export default http;

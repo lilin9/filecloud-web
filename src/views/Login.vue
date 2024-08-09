@@ -1,21 +1,19 @@
 <script setup>
 import { getCurrentInstance, ref, watch, watchEffect } from 'vue';
 import formRules from '@/utils/formRules';
-import regularCode from "@/assets/locale/regularCode"
+import regularCode from "@/utils/regularCode"
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
+import RequestCodeButton from '@/components/common/RequestCodeButton.vue';
+import { useVerifyCode } from '@/hooks/VerifyCode';
 
 const router = useRouter()
 const { proxy } = getCurrentInstance();
 const api = proxy.$api;
 const local = proxy.$local;
 
-//登录注册切换
-let isShowLogin = ref(true)
-//验证码按钮文本
-let verifyCodeBtnText = ref("获取验证码");
-const loginFormRef = ref(null)
-const registryFormRef = ref(null)
+//切换卡片类型：0 登录，1 注册，2 忘记密码
+let containIndex = ref(0)
 
 
 
@@ -28,6 +26,9 @@ const userInfo = ref({
   verifyCode: ''
 })
 
+
+//登录表单 ref
+const loginFormRef = ref(null);
 //登录点击事件
 const loginClick = () => {
   const userData = userInfo.value;
@@ -42,12 +43,15 @@ const loginClick = () => {
         local.saveToLocal(local.getLoginKey(), user);
         router.push('/home');
       } else {
-        ElMessage.error(result.message != '' && result.message != null ? result.message : '用户登录失败，请重试')
+        ElMessage.error(result.Message != '' && result.Message != null ? result.Message : '用户名或密码错误，请重试')
       }
     }
   })
 }
 
+
+//注册表单 ref
+const registryFormRef = ref(null);
 //注册点击事件
 const registerClick = () => {
   const user = userInfo.value;
@@ -66,7 +70,7 @@ const registerClick = () => {
       result = await api.register(user);
       if (result.success) {
         ElMessage.success("注册成功，请登录");
-        isShowLogin.value = true;
+        containIndex.value = 0;
       } else {
         ElMessage.error(result.message != '' && result.message != null ? result.message : '注册用户失败，请重试');
       }
@@ -74,22 +78,74 @@ const registerClick = () => {
   });
 }
 
+//重置密码框 ref
+const forgotFormRef = ref(null);
+//重置密码点击事件
+const resetPasswordClick = () => {
+  const user = userInfo.value;
+
+  //开启表单验证
+  forgotFormRef.value.validate(async valid => {
+    if (!valid) {
+      return;
+    }
+
+    //对邮箱验证码进行校验
+    let result = await api.checkCode(user);
+    if (!result || !result.success) {
+      ElMessage.error('邮箱验证码校验错误，请重新输入');
+      return;
+    }
+
+    result = await api.resetPassword(user);
+    console.log(result);
+    if (result && result.success) {
+      ElMessage.success('密码重置成功，请重新登录');
+      containIndex.value = 0;
+    } else {
+      ElMessage.error('密码重置失败，请重试');
+    }
+  });
+}
 
 
+
+//表单验证
+const passwordVerify = regularCode.passwordVerify;
+const validatorVerifyPassword = (rule, value, callback) => {
+  if (!passwordVerify.test(value)) {
+    callback(new Error("密码 4 ~ 16 位，不包含特殊字符"))
+  } else if (value != userInfo.value.password) {
+    callback(new Error("密码和再次输入的密码不一致"))
+  } else {
+    callback()
+  }
+}
+let registryFormRules = { ...formRules }
+registryFormRules.verifyPassword = [
+  { required: true, message: '密码不可以为空', trigger: 'blur' },
+  { validator: validatorVerifyPassword, trigger: 'blur' }
+]
+
+
+
+//邮箱验证码发送事件
+const senderVerifyCode = () => { return useVerifyCode(userInfo.value); }
 //验证邮箱合法性，然后禁用或者启用发送验证码按钮
-let verifyCodeBtnDisabled = ref(true);
+let enableSenderCodeBtn = ref(false);
 watchEffect(() => {
-  var regex = /^[\w-]+(\.[\w-]+)*@[\w-]+(\.[\w-]+)+$/;
+  var regex = regularCode.emailVerify;
   var eamil = userInfo.value.email;
   if (eamil != '' && regex.test(eamil)) {
-    verifyCodeBtnDisabled.value = false;
+    enableSenderCodeBtn.value = true;
   } else {
-    verifyCodeBtnDisabled.value = true;
+    enableSenderCodeBtn.value = false;
   }
 });
 
-//isShowLogin发生变化，将userInfo内容重置
-watch(isShowLogin, (newVal, oldVal) => {
+
+//containIndex发生变化，将userInfo内容重置
+watch(containIndex, (newVal, oldVal) => {
   if (newVal != oldVal) {
     userInfo.value = {
       userName: '',
@@ -100,72 +156,6 @@ watch(isShowLogin, (newVal, oldVal) => {
     }
   }
 });
-
-
-
-
-//计数器，控制验证码按钮进行 120s 的倒计时计数
-let counter = ref(120);
-const startCounter = () => {
-  verifyCodeBtnText.value = `${counter.value}秒`;
-  counter.value--;
-  const interval = setInterval(() => {
-    if (counter.value > 0) {
-      verifyCodeBtnText.value = `${counter.value}秒`;
-      counter.value--;
-    } else {
-      clearInterval(interval);
-    }
-  }, 1000);
-}
-
-//定时器，定时120s
-const startTimer = () => {
-  verifyCodeBtnDisabled.value = true;
-  startCounter();
-
-  setTimeout(() => {
-    verifyCodeBtnText.value = "获取验证码";
-    verifyCodeBtnDisabled.value = false;
-  }, 2 * 60 * 1000);
-}
-
-//获取验证码
-const getVerifyCodeClick = async () => {
-  let user = userInfo.value;
-  if (user.email == '') {
-    ElMessage.warning("请输入邮箱");
-    return;
-  }
-
-  //将获取验证码按钮，改为一个120秒内禁止点击并且进行倒计时的按钮
-  startTimer();
-  let result = await api.senderCode(user.email);
-  if (!result.success) {
-    ElMessage.error("验证码发送失败，请点击重新获取");
-  }
-}
-
-
-
-
-
-//表单验证
-const passwordVerify = regularCode.passwordVerify;
-const validatorVerifyPassword = (rule, value, callback) => {
-  if (!passwordVerify.test(value)) {
-    callback(new Error("密码 4 ~ 16 位，不包含特殊字符"))
-  } else if (value != userInfo.value.password) {
-    callback(new Error("登录密码和再次输入的密码不一致"))
-  } else {
-    callback()
-  }
-}
-let registryFormRules = { ...formRules }
-registryFormRules.verifyPassword = [
-  { required: true, message: '登录密码不可以为空', trigger: 'blur' },
-  { validator: validatorVerifyPassword, trigger: 'blur' }
-]
 </script>
 
 <template>
@@ -173,49 +163,51 @@ registryFormRules.verifyPassword = [
     <div class="loginNest">
       <div class="title">
         <el-image src="/static/images/logo.png" class="logoImg"></el-image>
-        <el-text v-if="isShowLogin">兜兜网盘</el-text>
-        <el-text v-else>欢迎注册</el-text>
+        <el-text v-if="containIndex == 0">在线网盘</el-text>
+        <el-text v-if="containIndex == 1">欢迎注册</el-text>
+        <el-text v-if="containIndex == 2">密码重置</el-text>
       </div>
       <div class="container">
         <!-- 登录 -->
-        <div class="containerContent" v-if="isShowLogin">
+        <div class="containerContent" v-if="containIndex == 0">
           <el-form :model="userInfo" :rules="formRules" ref="loginFormRef">
             <el-form-item prop="email">
               <el-input size="large" v-model="userInfo.email" placeholder="请输入邮箱" clearable></el-input>
             </el-form-item>
             <el-form-item prop="password">
-              <el-input type="password" size="large" v-model="userInfo.password" placeholder="请输入登录密码"
-                clearable></el-input>
+              <el-input type="password" size="large" v-model="userInfo.password" placeholder="请输入登录密码" clearable
+                show-password></el-input>
             </el-form-item>
             <el-form-item class="loginOrRegisterItem">
               <el-button type="primary" size="large" @click="loginClick">登录</el-button>
             </el-form-item>
           </el-form>
           <div class="buttomButton">
-            <el-button link size="small">忘记密码</el-button>
-            <el-button link size="small" @click="isShowLogin = false">免费注册</el-button>
+            <el-button link size="small" @click="containIndex = 2">忘记密码</el-button>
+            <el-button link size="small" @click="containIndex = 1">免费注册</el-button>
           </div>
         </div>
 
+
         <!-- 注册 -->
-        <div class="containerContent" v-else>
+        <div class="containerContent" v-if="containIndex == 1">
           <el-form :model="userInfo" :rules="registryFormRules" ref="registryFormRef">
             <el-form-item prop="userName">
               <el-input size="large" v-model="userInfo.userName" placeholder="用户名" clearable></el-input>
             </el-form-item>
             <el-form-item prop="password">
-              <el-input type="password" size="large" v-model="userInfo.password" placeholder="请设置你的登录密码"
-                clearable></el-input>
+              <el-input type="password" size="large" v-model="userInfo.password" placeholder="请设置你的登录密码" clearable
+                show-password></el-input>
             </el-form-item>
             <el-form-item prop="verifyPassword">
               <el-input type="password" size="large" v-model="userInfo.verifyPassword" placeholder="请再次输入你的登录密码"
-                clearable></el-input>
+                clearable show-password></el-input>
             </el-form-item>
             <el-form-item prop="email">
               <el-input size="large" v-model="userInfo.email" placeholder="请输入邮箱地址" clearable>
                 <template #append>
-                  <el-button @click="getVerifyCodeClick" :disabled="verifyCodeBtnDisabled">{{ verifyCodeBtnText
-                    }}</el-button>
+                  <RequestCodeButton :text="'获取验证码'" v-model:enable="enableSenderCodeBtn" :number="120"
+                    :on-sender="senderVerifyCode" />
                 </template>
               </el-input>
             </el-form-item>
@@ -228,7 +220,40 @@ registryFormRules.verifyPassword = [
           </el-form>
           <div class="buttomButton">
             <el-button link size="small"></el-button>
-            <el-button link size="small" @click="isShowLogin = true">>>前往登录</el-button>
+            <el-button link size="small" @click="containIndex = 0">>>前往登录</el-button>
+          </div>
+        </div>
+
+
+        <!-- 忘记密码 -->
+        <div class="containerContent" v-if="containIndex == 2">
+          <el-form :model="userInfo" :rules="registryFormRules" ref="forgotFormRef">
+            <el-form-item prop="password">
+              <el-input type="password" size="large" v-model="userInfo.password" placeholder="输入你的新密码" clearable
+                show-password></el-input>
+            </el-form-item>
+            <el-form-item prop="verifyPassword">
+              <el-input type="password" size="large" v-model="userInfo.verifyPassword" placeholder="确认你的新密码" clearable
+                show-password></el-input>
+            </el-form-item>
+            <el-form-item prop="email">
+              <el-input size="large" v-model="userInfo.email" placeholder="请输入邮箱地址" clearable>
+                <template #append>
+                  <RequestCodeButton :text="'获取验证码'" v-model:enable="enableSenderCodeBtn" :number="120"
+                    :on-sender="senderVerifyCode" />
+                </template>
+              </el-input>
+            </el-form-item>
+            <el-form-item prop="verifyCode">
+              <el-input size="large" v-model="userInfo.verifyCode" placeholder="请输入邮箱验证码" clearable></el-input>
+            </el-form-item>
+            <el-form-item class="loginOrRegisterItem">
+              <el-button type="primary" size="large" @click="resetPasswordClick">重置密码</el-button>
+            </el-form-item>
+          </el-form>
+          <div class="buttomButton">
+            <el-button link size="small" @click="containIndex = 0">>>前往登录</el-button>
+            <el-button link size="small" @click="containIndex = 1">前往注册</el-button>
           </div>
         </div>
       </div>
